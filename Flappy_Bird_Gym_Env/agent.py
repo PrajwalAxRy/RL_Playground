@@ -4,6 +4,7 @@ from dqn import DQN
 from replay_memory_buffer import ReplayMemoryBuffer
 import yaml
 import torch
+from torch import nn
 import itertools
 import os
 import random
@@ -26,13 +27,22 @@ class Agent:
         epsilon_start: 0.9
         epsilon_min: 0.05
         epsilon_decay: 0.9995
+        network_sync_rate: 20
+        learning_rate: 0.001
+        discount_factor: 0.99
         """  
         self.replay_buffer_size = config['replay_buffer_size']
         self.mini_batch_size = config['mini_batch_size']
         self.epsilon_start = config['epsilon_start']
         self.epsilon_min = config['epsilon_min']
-        self.epsilon_decay = config['epsilon_decay']   
-        
+        self.epsilon_decay = config['epsilon_decay']
+        self.network_sync_rate = config['network_sync_rate']
+        self.learning_rate = config['learning_rate']
+        self.discount_factor = config['discount_factor']
+
+        self.loss_fn = torch.nn.MSELoss()
+        self.optimizer = torch.optim.Adam
+
     #We will use this for both training and testing
     def run(self, is_training=True, render=False):
         #env = gymnasium.make("FlappyBird-v0", render_mode="human" if render else None)
@@ -49,7 +59,16 @@ class Agent:
 
         if is_training:
             memory = ReplayMemoryBuffer(max_size=self.replay_buffer_size)
+            
             epsilon = self.epsilon_start
+
+            target_DQN = DQN(num_states, num_actions).to(device)
+            target_DQN.load_state_dict(policy_DQN.state_dict())
+
+            #We well use this to update the target network
+            step_counter = 0
+
+            self.optimizer = torch.optim.Adam(policy_DQN.parameters(), lr=self.learning_rate)
 
         for episode in itertools.count():
             state, _ = env.reset()
@@ -78,6 +97,8 @@ class Agent:
 
                 if is_training:
                     memory.append((state, action, reward, new_state, terminated))
+
+                    step_counter += 1
                 
                 state = new_state
 
@@ -85,6 +106,36 @@ class Agent:
 
             epsilon = max(self.epsilon_min, epsilon * self.epsilon_decay)
             epsilon_history.append(epsilon)
+
+            if len(memory) > self.mini_batch_size and is_training:
+                # Sample a mini-batch from the memory
+                mini_batch = memory.sample(self.mini_batch_size)
+                
+                self.optimize(policy_DQN, target_DQN, mini_batch) ## This is where training happens
+
+                if step_counter > self.network_update_frequency:
+                    target_DQN.load_state_dict(policy_DQN.state_dict())
+                    step_counter = 0
+
+    def optimize(self, policy_DQN, target_DQN, mini_batch):
+
+        for state, action, reward, new_state, terminated in mini_batch:
+            if terminated:
+                target = reward
+            else:
+                with torch.no_grad():
+                    target_q = reward + self.discount_factor * target_DQN(new_state.unsqueeze(dim=0)).squeeze().max()
+
+            current_q = policy_DQN(state.unsqueeze(dim=0)).squeeze()
+
+            loss = self.loss_fn(current_q[action], target)
+
+            #Optimize the model
+            self.optimizer.zero_grad() # Clear the gradients
+            loss.backward() # compute the gradients
+            self.optimizer.step() # Update the model parameters
+
+        
 
 
 if __name__ == '__main__':
