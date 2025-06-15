@@ -197,6 +197,6 @@ if __name__ == '__main__':
 
     dql  = Agent(hyperparameter_set=args.hyperparameter)
     if args.train:
-        dql.run(is_training=True, render=True)  # Set render to false to train faster
+        dql.run(is_training=True, render=False)  # Set render to false to train faster
     else:
         dql.run(is_training=False, render=True)  # Set render to true to see the agent play the game
