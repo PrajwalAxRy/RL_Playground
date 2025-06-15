@@ -5,5 +5,22 @@ cartpole1:
   epsilon_start: 0.9
   epsilon_min: 0.05
   epsilon_decay: 0.9995
-
-  
+  network_sync_rate: 20
+  learning_rate: 0.001
+  discount_factor: 0.99
+  stop_on_reward: 1500
+  fc1_nodes: 256
+flappybird1:
+  env_name: FlappyBird-v0
+  replay_buffer_size: 100000
+  mini_batch_size: 32
+  epsilon_start: 1
+  epsilon_decay: 0.99995
+  epsilon_min: 0.05
+  network_sync_rate: 10
+  learning_rate: 0.0001
+  discount_factor: 0.99
+  stop_on_reward: 500
+  fc1_nodes: 256
+  env_make_params:
+    use_lidar: False
