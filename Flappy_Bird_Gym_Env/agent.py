@@ -1,6 +1,7 @@
 import flappy_bird_gymnasium
 import gymnasium
 from dqn import DQN
+from replay_memory_buffer import ReplayMemoryBuffer
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -13,23 +14,32 @@ class Agent:
         num_states = env.observation_space.shape[0]
         num_actions = env.action_space.n
 
+        rewards_per_episode = []
+
         policy_DQN = DQN(num_states, num_actions).to(device)
 
+        if is_training:
+            memory = ReplayMemoryBuffer(max_size=10000)
 
+        for episode in itertools.count():
+            state, _ = env.reset()
+            terminated = False
+            episode_reward = 0
 
-env = gymnasium.make("FlappyBird-v0", render_mode="human", use_lidar=True)
+            ## We will train indefinitely, and close the environment manually based on rewards per episode data.
+            while not terminated:
+                # Next action:
+                # (feed the observation to your agent here)
+                action = env.action_space.sample()      #TODO: Currently taking actions ramdomly, fix this with epsilon-greedy.
 
-obs, _ = env.reset()
-while True:
-    # Next action:
-    # (feed the observation to your agent here)
-    action = env.action_space.sample()
+                # Processing:
+                new_state, reward, terminated, _, info = env.step(action)
+                
+                episode_reward += reward
 
-    # Processing:
-    obs, reward, terminated, _, info = env.step(action)
-    
-    # Checking if the player is still alive
-    if terminated:
-        break
+                if is_training:
+                    memory.append((state, action, reward, new_state, terminated))
+                
+                state = new_state
 
-env.close()
+            rewards_per_episode.append(episode_reward)
